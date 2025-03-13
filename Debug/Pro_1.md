@@ -22,5 +22,5 @@ Target not created.
 
 ​	进入`Option for Target`菜单卡 -> `Linker` -> 取消勾选 `Use Memory Layout from Target Dialog.`-> 并且将下方的`Scatter file`路径置空 -> 确定保存，重新编译即可。如下图所示：
 
-![](Pic\Pro-1.png)
+![](Pic/Pro-1.png)
 
