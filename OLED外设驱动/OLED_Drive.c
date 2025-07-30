@@ -1,4 +1,5 @@
 #include "OLED_Drive.h"
+#include "OLED_Font.h"
 
 #define I2C_START()  I2C_GenerateSTART(I2C1, ENABLE) // 产生起始信号.
 #define I2C_STOP()  I2C_GenerateSTOP(I2C1, ENABLE)  // 产生终止信号.
@@ -19,7 +20,7 @@ void I2C_Hard_Init(void)
 	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C; 	
 	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
 	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-	I2C_InitStructure.I2C_ClockSpeed = 50000;
+	I2C_InitStructure.I2C_ClockSpeed = 350000;
 	I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
 	I2C_InitStructure.I2C_OwnAddress1 = 0xF0;
 	I2C_Init(I2C1, &I2C_InitStructure);
@@ -38,6 +39,11 @@ ErrorStatus IIC_WaitEvent(I2C_TypeDef* I2Cx, uint32_t I2C_EVENT)
 	return SUCCESS;
 }
 
+
+/*
+		@brief: 指令写入.
+		@parm: command  SSD1306的控制指令.
+*/
 void OLED_WriteCommand(uint8_t command)
 {
 	I2C_START();
@@ -55,6 +61,11 @@ void OLED_WriteCommand(uint8_t command)
 	I2C_STOP();
 }
 
+
+/*
+		@brief:  写入数据.
+		@parm: Byte  要写入的字节数据.
+*/
 void OLED_WriteByte(uint8_t Byte)
 {
 	I2C_START();
@@ -72,11 +83,98 @@ void OLED_WriteByte(uint8_t Byte)
 	I2C_STOP();
 }
 
+
+
 void OLED_WriteCommand_Parm(uint8_t command, uint8_t parm)
 {
 	OLED_WriteCommand(command);
 	OLED_WriteCommand(parm);
 }
+
+
+/*	
+		@brief: 光标设置.
+		@param: Pages  页坐标 值域 0~7.
+		@param: Column  列坐标 值域 0~127.	
+*/
+void OLED_SetCursor(uint8_t Pages, uint8_t Column)
+{
+	OLED_WriteCommand(0xB0 + Pages);  // 写入页地址.
+	OLED_WriteCommand(0x00 | (Column & 0x0F)); // 写入列地址(低4位)
+	OLED_WriteCommand(0x10 | ((Column & 0xF0) >> 4)); // 写入列地址(高4位0)
+}
+
+
+/*
+		@brief: OLED清屏.
+*/
+void OLED_ClearScreen(void)
+{
+	OLED_SetCursor(0, 0);
+	for(uint8_t i = 0; i < 10; i++)
+	{
+		for(uint8_t j = 0; j < 128; j++)
+		{
+			OLED_WriteByte(0x00);
+		}
+	}
+}
+
+
+/*
+		@brief:  OLED显示一个字符.
+		@parm: Lines  字符所在行数.  
+		@parm: Columns  字符所在列数.
+		@parm: w_char  所要显示的字符.
+*/
+void OLED_DisplayChar(uint8_t Lines, uint8_t Columns, char w_char)
+{
+	OLED_SetCursor((Lines - 1) * 2, (Columns - 1) * 8);
+	
+	for(uint8_t i = 0; i < 8; i++)  // 显示上半部分.
+	{
+		OLED_WriteByte(OLED_F8x16[w_char - ' '][i]);
+	}
+	
+	OLED_SetCursor(2 * Lines - 1, (Columns - 1) * 8);
+	
+	for(uint8_t j = 0; j < 8; j++)  // 显示下半部分.
+	{
+		OLED_WriteByte(OLED_F8x16[w_char - ' '][j + 8]);
+	}
+}
+
+
+/*
+		@brief:  OLED显示一个字符串.
+		@parm: Lines  字符串所在行数.  
+		@parm: Columns  字符串所在列数.
+		@parm: w_char  所要显示的字符串.
+*/
+
+void OLED_DisplayStr(uint8_t Lines, uint8_t Columns, char* str)
+{
+	OLED_SetCursor((Lines - 1) * 2, (Columns - 1) * 8);
+	
+	for(uint8_t i = 0; str[i] != '\0'; i++) // 显示字符串上半部分.
+	{
+		for(uint8_t j = 0; j < 8; j++)
+		{
+			OLED_WriteByte(OLED_F8x16[str[i] - ' '][j]);
+		}
+	}
+	
+	OLED_SetCursor(2 * Lines - 1, (Columns - 1) * 8);
+	
+	for(uint8_t i = 0; str[i] != '\0'; i++) // 显示字符串下半部分.
+	{
+		for(uint8_t j = 0; j < 8; j++)
+		{
+			OLED_WriteByte(OLED_F8x16[str[i] - ' '][j + 8]);
+		}
+	}
+}
+
 
 void OLED_Init(void)
 {
@@ -103,6 +201,9 @@ void OLED_Init(void)
 	
 	// 显示开始行.
 	OLED_WriteCommand(SET_DISPALY_START_LINE0);
+	
+	// 设置寻址模式(0x00: 水平寻址).
+	OLED_WriteCommand_Parm(SET_ADDRESSING_MODE, 0x00);
 	
 	// 正常显示模式(关闭水平翻转).
 	OLED_WriteCommand(SET_SENGMENT_REMAP_OFF); 
@@ -134,5 +235,6 @@ void OLED_Init(void)
 	// 开启显示.
 	OLED_WriteCommand(SET_DISPLAY_ON);
 	
+	OLED_ClearScreen();
 }
 

@@ -2,10 +2,9 @@
 #define __OLED_DRI_H
 
 #include "stm32f10x.h"                  // Device header
-#include "OLED_Font.h"
 
 // 设备识别地址.
-#define  SLAVE_ADDRESS  0x3C  
+#define  SLAVE_ADDRESS  0x78  
 
 // 硬件I2C引脚定义.
 #define I2C_SCL_SDA_PortSource  GPIOB
@@ -34,10 +33,17 @@
 #define SET_NORMAL_DISPLAY  0xA6  // 正常显示.
 #define SET_INVERSE_DISPLAY  0xA7 // 倒转显示.
 #define SET_CHARGE_PUMP  0x8D   // 设置充电泵.
+#define SET_ADDRESSING_MODE 0x20  // 寻址模式设置.
 
 void OLED_Init(void); // OLED初始化.
 
 void OLED_ClearScreen(void); // OLED清屏.
+
+void OLED_DisplayChar(uint8_t Lines, uint8_t Columns, char w_char); // 显示字符.
+
+void OLED_DisplayStr(uint8_t Lines, uint8_t Columns, char* str); // 显示字符串.
+
+/*void OLED_SetCursor(uint8_t Y, uint8_t X)*/;
 
 /* void OLED_WriteByte(uint8_t Byte); */
 
