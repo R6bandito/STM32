@@ -11,6 +11,10 @@
 #define I2C_SDA_PinSource GPIO_Pin_7
 #define I2C_SCL_PinSource GPIO_Pin_6
 
+
+#define HEX_SHOW_TYPE_INTEGRITY  0xAA
+#define HEX_SHOW_TYPE_SIMPLE  0xBB
+
 /*
 	@命令地址映射.
 */
@@ -42,6 +46,12 @@ void OLED_ClearScreen(void); // OLED清屏.
 void OLED_DisplayChar(uint8_t Lines, uint8_t Columns, char w_char); // 显示字符.
 
 void OLED_DisplayStr(uint8_t Lines, uint8_t Columns, char* str); // 显示字符串.
+
+void OLED_DisplayNum(uint8_t Lines, uint8_t Columns, uint64_t Num); // 显示数字.
+
+void OLED_DisplayHexNum_4Byte(uint8_t Lines, uint8_t Columns, uint32_t HexNum,  uint8_t Mode); // 显示数字(十六进制)(4字节).
+
+void OLED_DisplayHexNum_1Byte(uint8_t Lines, uint8_t Columns, uint8_t HexNum, uint8_t Mode); // 显示数字(十六进制)(1字节).
 
 /*void OLED_SetCursor(uint8_t Y, uint8_t X)*/;
 

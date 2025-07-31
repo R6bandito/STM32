@@ -20,7 +20,7 @@ void I2C_Hard_Init(void)
 	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C; 	
 	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
 	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-	I2C_InitStructure.I2C_ClockSpeed = 350000;
+	I2C_InitStructure.I2C_ClockSpeed = 400000;
 	I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
 	I2C_InitStructure.I2C_OwnAddress1 = 0xF0;
 	I2C_Init(I2C1, &I2C_InitStructure);
@@ -174,6 +174,149 @@ void OLED_DisplayStr(uint8_t Lines, uint8_t Columns, char* str)
 		}
 	}
 }
+
+
+/*
+		@brief: 计算所传入数字的位数.
+		@parm: Num 所要传入的数字.
+*/
+uint8_t CountNumLength(uint64_t Num)
+{
+	uint64_t Time = 10;
+	uint8_t Count = 1;
+	
+	while(Num / Time != 0)
+	{
+		Num /= Time;
+		Count++;
+	}
+	
+	return Count;
+}
+
+
+/*
+		@brief:  幂的次方运算.
+		@parm: X  底数.
+		@parm: Y  指数.
+*/
+uint64_t GetPow(uint8_t X, uint8_t Y)
+{
+	uint64_t Result = 1;
+	
+	while(Y --)
+	{
+		Result *= X;
+	}
+	
+	return Result;
+}
+
+
+/*
+		@brief: 显示数字.
+		@parm: Lines 	显示位置(行).
+		@parm: Columns  显示位置(列).
+		@parm: Num	所要显示的数字.
+*/
+void OLED_DisplayNum(uint8_t Lines, uint8_t Columns, uint64_t Num)
+{
+	uint8_t Length = CountNumLength(Num); 
+	
+	OLED_SetCursor((Lines - 1) * 2, (Columns - 1) * 8);
+	
+	for(uint8_t i = 0; i < Length; i++)  // 显示上半部分.
+	{
+		for(uint8_t j = 0; j < 8; j++)
+		{
+			OLED_WriteByte(OLED_F8x16[Num / GetPow(10, Length - i - 1) % 10 + 16][j]);
+		}
+	}
+	
+	OLED_SetCursor((2 * Lines) - 1, (Columns - 1) * 8);
+	
+	for(uint8_t i = 0; i < Length; i++)
+	{
+		for(uint8_t j = 0; j < 8; j++)
+		{
+			OLED_WriteByte(OLED_F8x16[Num / GetPow(10, Length - i - 1) % 10 + 16][j + 8]);
+		}
+	}
+}
+
+
+/*
+		@brief: 16进制显示(1字节).
+		@parm: Lines 显示位置(行).
+		@parm: Columns 显示位置(列).
+		@parm: HexNum 数据.
+		@parm: Mode 显示模式.
+*/
+
+void OLED_DisplayHexNum_1Byte(uint8_t Lines, uint8_t Columns, uint8_t HexNum, uint8_t Mode)
+{
+	uint8_t num_low = HexNum & 0x0F;
+	
+	uint8_t num_high = ((HexNum >> 4) & 0x0F);
+	
+	num_low = (num_low < 10) ? (num_low + '0') : (num_low - 10 + 'A' );
+	
+	num_high = (num_high < 10) ? (num_high + '0') : (num_high - 10 + 'A' );
+	
+	if(Mode == HEX_SHOW_TYPE_INTEGRITY)
+	{
+		OLED_DisplayChar(Lines, Columns, '0');
+		
+		Columns++;
+		
+		OLED_DisplayChar(Lines, Columns, 'x');
+		
+		Columns++;
+	}
+	
+	OLED_DisplayChar(Lines, Columns, num_high); // 显示高4位.
+	
+	OLED_DisplayChar(Lines, Columns + 1, num_low);  // 显示低4位.
+}
+
+
+
+/*
+		@brief: 16进制显示. (4字节)
+		@parm: Lines 显示位置(行).
+		@parm: Columns 显示位置(列).
+		@parm: HexNum 数据.
+		@parm: Mode 显示模式.
+*/
+void OLED_DisplayHexNum_4Byte(uint8_t Lines, uint8_t Columns, uint32_t HexNum, uint8_t Mode)
+{	
+	uint8_t HexByte[4];
+	
+	HexByte[0] = (HexNum >> 24) & 0xFF; 
+	
+	HexByte[1] = (HexNum >> 16) & 0xFF; 
+	
+	HexByte[2] = (HexNum >> 8) & 0xFF;
+	
+	HexByte[3] = (HexNum) & 0xFF;
+	
+	for(uint8_t i = 0; i < 4; i++)
+	{
+		OLED_DisplayHexNum_1Byte(Lines, Columns, HexByte[i], Mode);
+		
+		if (Mode == HEX_SHOW_TYPE_INTEGRITY)
+		{
+			Mode = HEX_SHOW_TYPE_SIMPLE;
+			
+			Columns += 4;
+			
+			continue;
+		}
+		
+		Columns += 2;
+	}
+}
+
 
 
 void OLED_Init(void)
