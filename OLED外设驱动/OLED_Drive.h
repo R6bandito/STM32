@@ -2,6 +2,10 @@
 #define __OLED_DRI_H
 
 #include "stm32f10x.h"                  // Device header
+#include <string.h>
+
+
+/* *************************************************************  */
 
 // 设备识别地址.
 #define  SLAVE_ADDRESS  0x78  
@@ -11,6 +15,7 @@
 #define I2C_SDA_PinSource GPIO_Pin_7
 #define I2C_SCL_PinSource GPIO_Pin_6
 
+/* *************************************************************  */
 
 #define HEX_SHOW_TYPE_INTEGRITY  0xAA
 #define HEX_SHOW_TYPE_SIMPLE  0xBB
@@ -35,11 +40,31 @@
 #define SET_ENTIRE_DISPLAY_RAM  0xA4  // 跟随RAM显示.
 #define SET_ENTIRE_DISPLAY_ON  0xA5		// 不跟随RAM显示.
 #define SET_NORMAL_DISPLAY  0xA6  // 正常显示.
-#define SET_INVERSE_DISPLAY  0xA7 // 倒转显示.
+#define SET_INVERSE_DISPLAY  0xA7 // 反相显示.
 #define SET_CHARGE_PUMP  0x8D   // 设置充电泵.
 #define SET_ADDRESSING_MODE 0x20  // 寻址模式设置.
 
-void OLED_Init(void); // OLED初始化.
+/*
+	@notice: OLED配置结构体，利用该结构体进行配置可调节OLED亮度，显示反转，正反相显示等功能.
+						可传入NULL，将使用默认参数进行配置.
+*/
+typedef struct oled_type {
+	
+	uint8_t DispalyOffset;
+	uint8_t AddressMode;
+	FunctionalState SegmentRemap;
+	uint8_t Contrast;
+	FunctionalState VerticalDis;
+	FunctionalState Inverse;
+	FunctionalState EntireDis;
+	
+} OLED_InitTypeDef;
+
+#define Address_Mode_Horizontal  0x00
+#define Address_Mode_Vertical  0x01
+#define Address_Mode_Page  0x02
+
+void OLED_Init(OLED_InitTypeDef *OLED_InitStructure); // OLED初始化.
 
 void OLED_ClearScreen(void); // OLED清屏.
 
@@ -49,9 +74,13 @@ void OLED_DisplayStr(uint8_t Lines, uint8_t Columns, char* str); // 显示字符
 
 void OLED_DisplayNum(uint8_t Lines, uint8_t Columns, uint64_t Num); // 显示数字.
 
+void OLED_DisplaySignedNum(uint8_t Lines, uint8_t Columns, int64_t Num); // 显示数字(正负).
+
 void OLED_DisplayHexNum_4Byte(uint8_t Lines, uint8_t Columns, uint32_t HexNum,  uint8_t Mode); // 显示数字(十六进制)(4字节).
 
 void OLED_DisplayHexNum_1Byte(uint8_t Lines, uint8_t Columns, uint8_t HexNum, uint8_t Mode); // 显示数字(十六进制)(1字节).
+
+void OLED_DisplayBinNum(uint8_t Lines, uint8_t Columns, uint8_t Num);  // 二进制显示.
 
 /*void OLED_SetCursor(uint8_t Y, uint8_t X)*/;
 
@@ -62,5 +91,7 @@ void OLED_DisplayHexNum_1Byte(uint8_t Lines, uint8_t Columns, uint8_t HexNum, ui
 /* ErrorStatus IIC_WaitEvent(I2C_TypeDef* I2Cx, uint32_t I2C_EVENT); */
 
 /* void OLED_WriteCommand(uint8_t command); */
+
+/* void struct_default_init(OLED_InitTypeDef *); */
 
 #endif // __OLED_DRI_H

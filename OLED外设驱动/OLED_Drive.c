@@ -246,6 +246,33 @@ void OLED_DisplayNum(uint8_t Lines, uint8_t Columns, uint64_t Num)
 
 
 /*
+		@brief: 显示有符号数字.
+		@parm: Lines 	显示位置(行).
+		@parm: Columns  显示位置(列).
+		@parm: Num	所要显示的数字.
+*/
+void OLED_DisplaySignedNum(uint8_t Lines, uint8_t Columns, int64_t Num)
+{
+	uint64_t NumTemp;
+	
+	if (Num < 0)
+	{
+		OLED_DisplayChar(Lines, Columns++, '-');
+		
+		NumTemp = -Num;
+	}
+	else if (Num > 0)
+	{
+		OLED_DisplayChar(Lines, Columns++, '+');
+		
+		NumTemp = Num;
+	}
+	
+	OLED_DisplayNum(Lines, Columns, NumTemp);
+}
+
+
+/*
 		@brief: 16进制显示(1字节).
 		@parm: Lines 显示位置(行).
 		@parm: Columns 显示位置(列).
@@ -318,14 +345,73 @@ void OLED_DisplayHexNum_4Byte(uint8_t Lines, uint8_t Columns, uint32_t HexNum, u
 }
 
 
+/*
+		@brief: 将一个字节数据以二进制形式显示.
+		@parm: Lines 显示的位置(行).
+		@parm: Columns 显示的位置(列).
+		@parm: Num 数据.
+*/
+void OLED_DisplayBinNum(uint8_t Lines, uint8_t Columns, uint8_t Num)
+{
+	char IndexArr_High[5];
+	
+	char IndexArr_Low[5];
+	
+	IndexArr_High[4] = '\0';
+	
+	IndexArr_Low[4] = '\0';
+	
+	for(uint8_t i = 0; i < 4; i++)
+	{
+		IndexArr_High[i] = (Num & (0x80 >> i)) ? ('1') : ('0');
+	}
+	
+	for(uint8_t i = 0; i < 4; i++)
+	{
+		IndexArr_Low[i] = ((Num << 4) & (0x80 >> i)) ? ('1') : ('0');
+	}
+	
+	OLED_DisplayStr(Lines, Columns, IndexArr_High);
+	
+	OLED_DisplayStr(Lines, Columns + 3, IndexArr_Low);
+}
 
-void OLED_Init(void)
+
+void struct_default_init(OLED_InitTypeDef *OLED_InitStructure)
+{
+	OLED_InitStructure -> AddressMode = Address_Mode_Horizontal;
+	
+	OLED_InitStructure -> Contrast = 0xFF;
+	
+	OLED_InitStructure -> DispalyOffset = 0x00;
+	
+	OLED_InitStructure -> EntireDis = DISABLE;
+	
+	OLED_InitStructure -> Inverse = DISABLE;
+	
+	OLED_InitStructure -> SegmentRemap = DISABLE;
+	
+	OLED_InitStructure -> VerticalDis = DISABLE;
+	
+}
+
+
+void OLED_Init(OLED_InitTypeDef *OLED_InitStructure)
 {
 	uint32_t i, j;
 	
+	OLED_InitTypeDef initstructure;
+	
+	struct_default_init(&initstructure);
+	
+	if (OLED_InitStructure != NULL)
+	{
+		memcpy(&initstructure, OLED_InitStructure, sizeof(OLED_InitTypeDef));
+	}
+	
 	for (i = 0; i < 1000; i++)			//上电延时
 	{
-		for (j = 0; j < 1500; j++);
+		for (j = 0; j < 1000; j++);
 	}
 	
 	I2C_Hard_Init();
@@ -340,25 +426,40 @@ void OLED_Init(void)
 	OLED_WriteCommand_Parm(SET_MULTIPLEX_RATIO, 0x3F);
 	
 	// 显示偏移. 0000 0000 (默认无偏移).
-	OLED_WriteCommand_Parm(SET_DISPLAY_OFFSET, 0x00);
+	OLED_WriteCommand_Parm(SET_DISPLAY_OFFSET, initstructure.DispalyOffset);
 	
 	// 显示开始行.
 	OLED_WriteCommand(SET_DISPALY_START_LINE0);
 	
 	// 设置寻址模式(0x00: 水平寻址).
-	OLED_WriteCommand_Parm(SET_ADDRESSING_MODE, 0x00);
+	OLED_WriteCommand_Parm(SET_ADDRESSING_MODE, initstructure.AddressMode);
 	
-	// 正常显示模式(关闭水平翻转).
-	OLED_WriteCommand(SET_SENGMENT_REMAP_OFF); 
-	
-	// 正常显示模式(关闭垂直翻转).
-	OLED_WriteCommand(SET_SENGMENT_VERTICAL_NORMAL);
+	// 是否开启水平翻转.
+	if (initstructure.SegmentRemap == DISABLE)
+	{
+		OLED_WriteCommand(SET_SENGMENT_REMAP_OFF); 
+	}
+	else 
+	{
+		OLED_WriteCommand(SET_SENGMENT_REMAP_ON); 
+	}
+
+	// 是否开启垂直翻转.
+	if (initstructure.VerticalDis == DISABLE)
+	{
+		OLED_WriteCommand(SET_SENGMENT_VERTICAL_NORMAL);
+	}
+	else
+	{
+		OLED_WriteCommand(SET_SENGMENT_VERTICAL_ON);
+	}
+
 	
 	// COM引脚配置(0001 0010 为默认配置).
 	OLED_WriteCommand_Parm(SET_COMPINS_HARDWARE_CONFIG, 0x12); 
 	
 	// 对比度设置.(0x00 ~ 0xFF).
-	OLED_WriteCommand_Parm(SET_CONTRAST_CONTROL, 0x98);
+	OLED_WriteCommand_Parm(SET_CONTRAST_CONTROL, initstructure.Contrast);
 	
 	// 预充电周期设置.
 	OLED_WriteCommand_Parm(SET_PRE_CHARGE_PERIOD, 0xF1);
@@ -366,12 +467,26 @@ void OLED_Init(void)
 	// 设置VCOMH电压倍率.
 	OLED_WriteCommand_Parm(SET_VCOMH_DESELECT_LEVEL, 0x30);
 	
-	// 跟随RAM显示.
-	OLED_WriteCommand(SET_ENTIRE_DISPLAY_RAM);
-	
-	// 正常显示.
-	OLED_WriteCommand(SET_NORMAL_DISPLAY);
-	
+	// 是否跟随RAM显示.
+	if (initstructure.EntireDis == DISABLE) 	
+	{
+		OLED_WriteCommand(SET_ENTIRE_DISPLAY_RAM);
+	}
+	else 
+	{
+		OLED_WriteCommand(SET_ENTIRE_DISPLAY_ON);
+	}
+
+	// 是否反相显示.
+	if (initstructure.Inverse == DISABLE)
+	{
+		OLED_WriteCommand(SET_NORMAL_DISPLAY);		
+	}
+	else 
+	{
+		OLED_WriteCommand(SET_INVERSE_DISPLAY);
+	}
+
 	// 设置充电泵.
 	OLED_WriteCommand_Parm(SET_CHARGE_PUMP, 0x14);
 	
