@@ -5,17 +5,76 @@
 #include <string.h>
 
 
+/*
+		@notice: 下列两个宏定义 (USE_I2C_HAREWARE) (USE_I2C_SOFTWARE)分别用于启用不同的I2C通讯方式.
+			USE_I2C_HAREWARE : 当启用该宏，且注释掉 USE_I2C_SOFTWARE时，将使用硬件I2C通信. (默认)
+			USE_I2C_SOFTWARE : 当启用该宏，且注释掉 USE_I2C_HAREWARE时，将使用软件模拟I2C通信.
+			注意：禁止同时启用	USE_I2C_HAREWARE  USE_I2C_SOFTWARE.
+*/
+
+/* **************************  */
+ #define USE_I2C_HAREWARE 
+
+// #define USE_I2C_SOFTWARE 
+/* ************************* */
+
+
+
+/*
+		@notice:	下列宏定义将仅在 USE_I2C_SOFTWARE 启用时生效.
+			I2C_Soft_SCL_PortSource , I2C_Soft_SDA_PortSource :通信时钟线,数据线GPIO端口的代号.通过解除对应端口的注释来启用对应的通信端口.
+				(最多支持到GPIOC).
+			I2C_Soft_SCL_PinSource , I2C_Soft_SDA_PinSource :为对应GPIO口的引脚，使用时应将其更换为用户实际使用的引脚.
+			
+			默认情况: PB6 -> I2C_SCL  PB7 -> I2C_SDA.
+*/
+#ifdef USE_I2C_SOFTWARE
 /* *************************************************************  */
+	#define SLAVE_ADDRESS  0x78  // OLED设备地址.
+	
+	#define I2C_Soft_SCL_PortSource  GPIOB
+	
+//  #define I2C_Soft_SCL_PortSource  GPIOA
 
-// 设备识别地址.
-#define  SLAVE_ADDRESS  0x78  
+//	#define I2C_Soft_SCL_PortSource  GPIOC
+	
+	#define I2C_Soft_SDA_PortSource GPIOB
+	
+//	#define I2C_Soft_SDA_PortSource GPIOA
 
-// 硬件I2C引脚定义.
-#define I2C_SCL_SDA_PortSource  GPIOB
-#define I2C_SDA_PinSource GPIO_Pin_7
-#define I2C_SCL_PinSource GPIO_Pin_6
-
+//	#define I2C_Soft_SDA_PortSource GPIOC
+	
+	#define I2C_Soft_SCL_PinSource  GPIO_Pin_6
+	
+	#define I2C_Soft_SDA_PinSource  GPIO_Pin_7
 /* *************************************************************  */
+#endif // USE_I2C_SOFTWARE
+
+
+
+/*
+		@notice:	下列宏定义将仅在 USE_I2C_HAREWARE 启用时生效.
+			I2C_SCL_SDA_PortSource :	硬件I2C所采用的GPIO端口.
+			I2C_SDA_PinSource : 通信数据引脚.
+			I2C_SCL_PinSource : 时钟线引脚.
+			
+		注意: 硬件I2C仅支持 I2C1. 因此实际应填入I2C1对应的GPIO端口与引脚. 
+*/
+
+#ifdef USE_I2C_HAREWARE
+/* *************************************************************  */
+	// 设备识别地址.
+	#define  SLAVE_ADDRESS  0x78  
+
+	// 硬件I2C引脚定义.
+	#define I2C_SCL_SDA_PortSource  GPIOB
+	
+	#define I2C_SDA_PinSource GPIO_Pin_7
+	
+	#define I2C_SCL_PinSource GPIO_Pin_6
+/* *************************************************************  */
+#endif // USE_I2C_HAREWARE
+
 
 #define HEX_SHOW_TYPE_INTEGRITY  0xAA
 #define HEX_SHOW_TYPE_SIMPLE  0xBB
@@ -82,16 +141,5 @@ void OLED_DisplayHexNum_1Byte(uint8_t Lines, uint8_t Columns, uint8_t HexNum, ui
 
 void OLED_DisplayBinNum(uint8_t Lines, uint8_t Columns, uint8_t Num);  // 二进制显示.
 
-/*void OLED_SetCursor(uint8_t Y, uint8_t X)*/;
-
-/* void OLED_WriteByte(uint8_t Byte); */
-
-/* void I2C_Hard_Init(void);  // 硬件I2C初始化.*/
-
-/* ErrorStatus IIC_WaitEvent(I2C_TypeDef* I2Cx, uint32_t I2C_EVENT); */
-
-/* void OLED_WriteCommand(uint8_t command); */
-
-/* void struct_default_init(OLED_InitTypeDef *); */
 
 #endif // __OLED_DRI_H

@@ -1,8 +1,27 @@
 #include "OLED_Drive.h"
 #include "OLED_Font.h"
 
-#define I2C_START()  I2C_GenerateSTART(I2C1, ENABLE) // 产生起始信号.
-#define I2C_STOP()  I2C_GenerateSTOP(I2C1, ENABLE)  // 产生终止信号.
+
+
+#ifdef USE_I2C_HAREWARE
+
+	#define I2C_START()  I2C_GenerateSTART(I2C1, ENABLE) // 产生起始信号.
+	
+	#define I2C_STOP()  I2C_GenerateSTOP(I2C1, ENABLE)  // 产生终止信号.
+	
+#endif // USE_I2C_HAREWARE
+
+
+#ifdef USE_I2C_SOFTWARE
+
+	#define OLED_WRITE_SCL(x)  GPIO_WriteBit(I2C_Soft_SCL_PortSource, I2C_Soft_SCL_PinSource, (BitAction)(x))
+	
+	#define OLED_WRITE_SDA(x)  GPIO_WriteBit(I2C_Soft_SDA_PortSource, I2C_Soft_SDA_PinSource, (BitAction)(x))
+
+#endif // USE_I2C_SOFTWARE
+
+#ifdef USE_I2C_HAREWARE 
+
 
 void I2C_Hard_Init(void)
 {
@@ -83,6 +102,199 @@ void OLED_WriteByte(uint8_t Byte)
 	I2C_STOP();
 }
 
+#endif // USE_I2C_HAREWARE
+
+
+#ifdef USE_I2C_SOFTWARE
+void I2C_Soft_Init(void)
+{
+	if (I2C_Soft_SCL_PortSource == GPIOA) RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+	
+	if (I2C_Soft_SCL_PortSource == GPIOB) RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+	
+	if (I2C_Soft_SCL_PortSource == GPIOC) RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+	
+	GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD;
+	GPIO_InitStructure.GPIO_Pin = I2C_Soft_SCL_PinSource | I2C_Soft_SDA_PinSource;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	
+	if (I2C_Soft_SCL_PortSource == GPIOA) GPIO_Init(GPIOA, &GPIO_InitStructure);
+	
+	if (I2C_Soft_SCL_PortSource == GPIOB) GPIO_Init(GPIOB, &GPIO_InitStructure);
+	
+	if (I2C_Soft_SCL_PortSource == GPIOC) GPIO_Init(GPIOC, &GPIO_InitStructure);
+	
+	OLED_WRITE_SCL(1);
+	
+	OLED_WRITE_SDA(1);
+}
+
+
+/*
+		@brief: 软件I2C产生起始信号.
+		@parm: NULL
+*/
+void I2C_Soft_Start(void)
+{
+	OLED_WRITE_SCL(1);
+	
+	OLED_WRITE_SDA(1);
+	
+	OLED_WRITE_SDA(0);
+	
+	OLED_WRITE_SCL(0);
+}
+
+
+/*
+		@brief:	软件I2C产生停止信号.
+		@parm: NULL
+*/
+void I2C_Soft_Stop(void)
+{
+	OLED_WRITE_SDA(0);
+	
+	OLED_WRITE_SCL(1);
+	
+	OLED_WRITE_SDA(1);
+}
+
+
+/*
+		@brief:	软件I2C发送一个字节.
+		@parm: Byte  所要发送的字节数据.
+*/
+void I2C_Soft_SendByte(uint8_t Byte)
+{
+	for(uint8_t i = 0; i < 8; i++)
+	{
+		OLED_WRITE_SCL(0);
+		
+		if (((Byte << i )& 0x80) == 0x80)
+		{
+			OLED_WRITE_SDA(1);
+			
+			OLED_WRITE_SCL(1);
+		}
+		else
+		{
+			OLED_WRITE_SDA(0);
+			
+			OLED_WRITE_SCL(1);
+		}
+	}
+}
+
+
+/*
+		@brief:	软件I2C接收应答.
+		@parm: NULL.
+*/
+ErrorStatus I2C_Soft_RecvAck(void)
+{
+	uint16_t Timeout = 0;
+	
+	OLED_WRITE_SCL(0);
+	
+	OLED_WRITE_SDA(1);
+	
+	OLED_WRITE_SCL(1);
+	
+	while(GPIO_ReadInputDataBit(I2C_Soft_SDA_PortSource, I2C_Soft_SDA_PinSource))
+	{
+		Timeout++;
+		
+		if (Timeout > 1000)
+		{
+			OLED_WRITE_SCL(0);
+			
+			return ERROR;
+		}
+	}
+	
+	OLED_WRITE_SCL(0);
+	
+	return SUCCESS;
+}
+
+
+/*
+		@brief:	软件I2C写入命令.
+		@parm: command  所要写入的命令.
+*/
+void OLED_WriteCommand(uint8_t command)
+{
+	I2C_Soft_Start();
+	
+	I2C_Soft_SendByte(SLAVE_ADDRESS);
+	if (I2C_Soft_RecvAck() != SUCCESS)
+	{
+		I2C_Soft_SendByte(SLAVE_ADDRESS); // 再次尝试重新发送.
+		
+		if (I2C_Soft_RecvAck() != SUCCESS) return; // 依然未发送成功，终止此次通讯.
+	}
+	
+	
+	I2C_Soft_SendByte(0x00);
+	if (I2C_Soft_RecvAck() != SUCCESS)
+	{
+		I2C_Soft_SendByte(0x00); 
+		
+		if (I2C_Soft_RecvAck() != SUCCESS) return; 
+	}
+	
+	
+	I2C_Soft_SendByte(command);
+	if (I2C_Soft_RecvAck() != SUCCESS)
+	{
+		I2C_Soft_SendByte(command); 
+		
+		if (I2C_Soft_RecvAck() != SUCCESS) return; 
+	}
+	
+	I2C_Soft_Stop();
+}
+
+
+/*
+		@brief:	软件I2C写入数据.
+		@parm: Byte  所要写入的数据.
+*/
+void OLED_WriteByte(uint8_t Byte)
+{
+	I2C_Soft_Start();
+	
+	I2C_Soft_SendByte(SLAVE_ADDRESS);
+	if (I2C_Soft_RecvAck() != SUCCESS)
+	{
+		I2C_Soft_SendByte(SLAVE_ADDRESS); 
+		
+		if (I2C_Soft_RecvAck() != SUCCESS) return; 
+	}
+	
+	
+	I2C_Soft_SendByte(0x40);
+	if (I2C_Soft_RecvAck() != SUCCESS)
+	{
+		I2C_Soft_SendByte(0x40); 
+		
+		if (I2C_Soft_RecvAck() != SUCCESS) return; 
+	}
+	
+	
+	I2C_Soft_SendByte(Byte);
+	if (I2C_Soft_RecvAck() != SUCCESS)
+	{
+		I2C_Soft_SendByte(Byte); 
+		
+		if (I2C_Soft_RecvAck() != SUCCESS) return; 
+	}
+	
+	I2C_Soft_Stop();
+}
+
+#endif // USE_I2C_SOFTWARE
 
 
 void OLED_WriteCommand_Parm(uint8_t command, uint8_t parm)
@@ -414,7 +626,11 @@ void OLED_Init(OLED_InitTypeDef *OLED_InitStructure)
 		for (j = 0; j < 1000; j++);
 	}
 	
+#ifdef USE_I2C_HAREWARE
 	I2C_Hard_Init();
+#else 
+	I2C_Soft_Init();
+#endif // USE_I2C_HAREWARE
 	
 	// 关闭显示.
 	OLED_WriteCommand(SET_DISPLAY_OFF); 
