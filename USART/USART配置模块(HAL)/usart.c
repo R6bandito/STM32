@@ -2,7 +2,15 @@
 
 USART_HandleTypeDef USARTx_handle;
 
+USART_HandleTypeDef USART1_dual_handle;
+
+USART_HandleTypeDef USART2_dual_handle;
+
 uint8_t ErrorParmFlag = 0;
+
+#if defined(__CC_ARM)     // Keil ARM 编译器
+#pragma diag_suppress 1296
+#endif
 
 #if 1
 #if (__ARMCC_VERSION >= 6010050)            /* 使用AC6编译器时 */
@@ -39,13 +47,25 @@ char *_sys_command_string(char *cmd, int len)
     return NULL;
 }
 
-int fputc(int ch, FILE *f) {
- (void)f;
+  #if defined(__SINGLE__)
+    int fputc(int ch, FILE *f) {
+    (void)f;
 
-	HAL_USART_Transmit(&USARTx_handle, (uint8_t*)&ch, 1, HAL_MAX_DELAY);
+      HAL_USART_Transmit(&USARTx_handle, (uint8_t*)&ch, 1, HAL_MAX_DELAY);
 
-	return ch;
-}
+      return ch;
+    }
+  #endif // __SINGLE__
+
+  #if defined(__DUAL__)
+    int fputc(int ch, FILE *f) {
+      (void)f;
+
+        HAL_USART_Transmit(&USART1_dual_handle, (uint8_t*)&ch, 1, HAL_MAX_DELAY);
+
+        return ch;
+      }
+  #endif // __DUAL__
 #endif
 
 
@@ -58,11 +78,46 @@ void USART_GPIO_Init( void )
 
   if (USART_PortSource == GPIOC)   __HAL_RCC_GPIOC_CLK_ENABLE();
 
+#if defined(__DUAL__)
+  if (USART_2_PortsSource == GPIOA)   __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  if (USART_2_PortsSource == GPIOB)   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  if (USART_2_PortsSource == GPIOC)   __HAL_RCC_GPIOC_CLK_ENABLE();
+
+#endif // __DUAL__
 
   GPIO_InitTypeDef GPIO_InitStructure;
 
   GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
 
+#if defined(__DUAL__)
+  if (USART_2_PortsSource != USART_PortSource)
+  {
+    GPIO_InitStructure.Pull = GPIO_NOPULL;
+
+    GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
+
+    GPIO_InitStructure.Pin = USART_PinSource_Tx;
+
+    HAL_GPIO_Init(USART_PortSource, &GPIO_InitStructure);
+
+    GPIO_InitStructure.Pin = USART_2_PinSource_Tx;
+
+    HAL_GPIO_Init(USART_2_PortsSource, &GPIO_InitStructure);
+  }
+
+  if (USART_2_PortsSource == USART_PortSource)
+  {
+    GPIO_InitStructure.Pull = GPIO_NOPULL;
+
+    GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
+
+    GPIO_InitStructure.Pin = USART_PinSource_Tx | USART_2_PinSource_Tx;
+
+    HAL_GPIO_Init(USART_PortSource, &GPIO_InitStructure);
+  }
+#elif defined(__SINGLE__)
   GPIO_InitStructure.Pin = USART_PinSource_Tx;
 
   GPIO_InitStructure.Pull = GPIO_NOPULL;
@@ -70,19 +125,40 @@ void USART_GPIO_Init( void )
   GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
 
   HAL_GPIO_Init(USART_PortSource, &GPIO_InitStructure);
+#endif 
 
-  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
+#if defined(__DUAL__)
+  if (USART_2_PortsSource != USART_PortSource)
+  {
+    GPIO_InitStructure.Pull = GPIO_PULLUP;
 
-  GPIO_InitStructure.Pin = USART_PinSource_Rx;
+    GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
 
-  GPIO_InitStructure.Pull = GPIO_PULLUP;
+    GPIO_InitStructure.Pin = USART_PinSource_Rx;
 
-  HAL_GPIO_Init(USART_PortSource, &GPIO_InitStructure);
+    HAL_GPIO_Init(USART_PortSource, &GPIO_InitStructure);
+
+    GPIO_InitStructure.Pin = USART_2_PinSource_Rx;
+
+    HAL_GPIO_Init(USART_2_PortsSource, &GPIO_InitStructure);
+  }
+
+  if (USART_2_PortsSource == USART_PortSource)
+  {
+    GPIO_InitStructure.Pull = GPIO_PULLUP;
+
+    GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
+
+    GPIO_InitStructure.Pin = USART_PinSource_Rx | USART_2_PinSource_Rx;
+
+    HAL_GPIO_Init(USART_PortSource, &GPIO_InitStructure);
+  }
+#endif // __DUAL__
 
 }
 
 
-void Cus_USART_Init( uint32_t baudrate )
+void Cus_USART_Single_Init( uint32_t baudrate )
 {
   if (baudrate <= 0 || baudrate > MAX_BAUDRATE)
   {
@@ -147,5 +223,92 @@ void Cus_USART_Init( uint32_t baudrate )
 		
 		ErrorParmFlag = 0;
 	}
+}
+
+
+void Cus_USART_Dual_Init( USART_HandleTypeDef *USART_1, 
+                             USART_HandleTypeDef *USART_2,
+                                Initial_Mode mode )
+{
+  USART_GPIO_Init();
+
+  switch ((uint32_t)USART_1 -> Instance) 
+  {
+
+    case (uint32_t)USART1:
+        __HAL_RCC_USART1_CLK_ENABLE();
+        break;
+    case (uint32_t)USART2:
+        __HAL_RCC_USART2_CLK_ENABLE();
+        break;
+    case (uint32_t)USART3:
+        __HAL_RCC_USART3_CLK_ENABLE();
+        break;
+    default:
+        // 默认情况处理
+        break;
+  }
+
+  switch ((uint32_t)USART_2 -> Instance) 
+  {
+    case (uint32_t)USART1:
+        __HAL_RCC_USART1_CLK_ENABLE();
+        break;
+    case (uint32_t)USART2:
+        __HAL_RCC_USART2_CLK_ENABLE();
+        break;
+    case (uint32_t)USART3:
+        __HAL_RCC_USART3_CLK_ENABLE();
+        break;
+    default:
+        // 默认情况处理
+        break;
+  }
+
+  if (USART_1 == NULL && USART_2 == NULL)
+  {
+    if (USARTx_dual == USART1)   __HAL_RCC_USART1_CLK_ENABLE();
+
+    if (USARTx_dual == USART2)   __HAL_RCC_USART2_CLK_ENABLE();
+  
+    if (USARTx_dual == USART3)   __HAL_RCC_USART3_CLK_ENABLE();
+
+    Cus_USART_Single_Init(9600);
+
+    USART1_dual_handle = USARTx_handle;
+
+    USART1_dual_handle . Instance = USARTx_dual;
+
+    HAL_USART_Init(&USART1_dual_handle);
+  }
+
+
+  if (mode == INITIAL_MODE_EQUAL)
+  {
+    USART1_dual_handle = *USART_1;
+
+    USART_TypeDef *temp = USART_2 -> Instance;
+
+    *USART_2 = *USART_1;
+
+    USART2_dual_handle = *USART_2;
+
+    USART2_dual_handle  .  Instance = temp;
+
+    HAL_USART_Init(&USART1_dual_handle);
+
+    HAL_USART_Init(&USART2_dual_handle);
+  }
+
+  if (mode == INITIAL_MODE_IND)
+  {
+    USART1_dual_handle = *USART_1;
+
+    HAL_USART_Init(&USART1_dual_handle);
+
+    USART2_dual_handle = *USART_2;
+
+    HAL_USART_Init(&USART2_dual_handle);
+  }
 }
 

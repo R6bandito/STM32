@@ -5,10 +5,29 @@
 
 #include "stdio.h"
 
+extern USART_HandleTypeDef USARTx_handle;
+
+extern USART_HandleTypeDef USART1_dual_handle;
+
+extern USART_HandleTypeDef USART2_dual_handle;
+
 #define MAX_BAUDRATE   115200
 
+typedef  uint8_t  Initial_Mode;
 
-/*  此段宏定义用于配置所要使用的 USART 模块        */
+#define INITIAL_MODE_EQUAL  0xFF
+#define INITIAL_MODE_IND  0xFE
+#define INITIAL_MODE_NULL  0x00
+
+/*                     */
+ #define __SINGLE__
+
+ /* #define __DUAL__ */
+/*                     */
+
+
+
+/*  此段宏定义用于配置单个所要使用的 USART 模块        */
 #define USARTx   USART1
 
 #define USART_PortSource  GPIOA
@@ -17,6 +36,18 @@
 
 #define USART_PinSource_Rx  GPIO_PIN_10
 /*  默认参数为使用USART1, 端口为GPIOA  Tx引脚:PA9  Rx引脚:PA10  */
+
+
+
+/*  此段宏定义用于配置第二个所要使用的 USART 模块(双串口配置)        */
+#define USARTx_dual   USART3
+
+#define USART_2_PortsSource  GPIOB
+
+#define USART_2_PinSource_Tx  GPIO_PIN_10
+
+#define USART_2_PinSource_Rx  GPIO_PIN_11
+/*                                                    */
 
 
 
@@ -48,7 +79,12 @@
 
 
 
-void Cus_USART_Init( uint32_t baudrate );
+void Cus_USART_Single_Init( uint32_t baudrate );
+
+
+void Cus_USART_Dual_Init( USART_HandleTypeDef *USART_1, 
+                            USART_HandleTypeDef *USART_2,
+                              Initial_Mode mode );
 
 
 #endif // __CUS_USART_H
