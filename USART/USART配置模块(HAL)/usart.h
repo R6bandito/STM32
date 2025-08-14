@@ -5,6 +5,8 @@
 
 #include "stdio.h"
 
+#include "string.h"
+
 extern USART_HandleTypeDef USARTx_handle;
 
 extern USART_HandleTypeDef USART1_dual_handle;
@@ -12,6 +14,7 @@ extern USART_HandleTypeDef USART1_dual_handle;
 extern USART_HandleTypeDef USART2_dual_handle;
 
 #define MAX_BAUDRATE   115200
+#define MAX_BACKUP 5
 
 typedef  uint8_t  Initial_Mode;
 
@@ -19,11 +22,11 @@ typedef  uint8_t  Initial_Mode;
 #define INITIAL_MODE_IND  0xFE
 #define INITIAL_MODE_NULL  0x00
 
-/*                     */
+/*  单，双串口初始化开关.    */
  #define __SINGLE__
 
  /* #define __DUAL__ */
-/*                     */
+/*  注意：使用双串口初始化API时，需要解锁__DUAL__宏. 注释掉__SINGKE__ */
 
 
 
@@ -78,13 +81,32 @@ typedef  uint8_t  Initial_Mode;
 /*  注：同时启用多个宏将发生覆盖！        */
 
 
+typedef struct  
+{
+  USART_HandleTypeDef USART_BackUP;
 
-void Cus_USART_Single_Init( uint32_t baudrate );
+  FlagStatus suspend_flag;
+
+} USART_SuspendType ;
 
 
-void Cus_USART_Dual_Init( USART_HandleTypeDef *USART_1, 
-                            USART_HandleTypeDef *USART_2,
-                              Initial_Mode mode );
+
+
+#if defined(__SINGLE__)
+  void Cus_USART_Single_Init( uint32_t baudrate );
+#endif // __SINGLE__
+
+#if defined(__DUAL__)
+  void Cus_USART_Dual_Init( USART_HandleTypeDef *USART_1, 
+                              USART_HandleTypeDef *USART_2,
+                                Initial_Mode mode );
+#endif // __DUAL__
+
+void Cus_USART_Suspend( USART_HandleTypeDef *USART );
+
+void Cus_USART_Resume( USART_HandleTypeDef *USART );
+
+void SystemClock_Config( void );
 
 
 #endif // __CUS_USART_H

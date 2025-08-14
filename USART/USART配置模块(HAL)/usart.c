@@ -6,6 +6,10 @@ USART_HandleTypeDef USART1_dual_handle;
 
 USART_HandleTypeDef USART2_dual_handle;
 
+USART_SuspendType USART_BackUP[MAX_BACKUP];
+uint8_t Index = 0;
+
+
 uint8_t ErrorParmFlag = 0;
 
 #if defined(__CC_ARM)     // Keil ARM 编译器
@@ -67,6 +71,58 @@ char *_sys_command_string(char *cmd, int len)
       }
   #endif // __DUAL__
 #endif
+
+
+void __weak SystemClock_Config( void )
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1; // HSE预分频，不分频
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON; // Enable PLL
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;  // 选择HSE作为PLL时钟源
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9; // 倍频9倍，8MHz * 9 = 72MHz
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    // 用户自定义的 ErrorHandler().
+  }
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                                |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK; // 选择PLL作为系统时钟源
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;        // AHB总线时钟不分频
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;         // APB1总线时钟2分频（最大36MHz）
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;         // APB2总线时钟不分频
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    // 用户自定义的 ErrorHandler().
+  }
+  // HAL库系统定时器配置为1ms中断周期
+  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+  
+  // 设置系统定时器时钟源
+  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+  // 系统中断优先级分组设置
+  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+}
+
+
+void Cus_USART_BackUP_Initial( void )
+{
+  for(uint8_t i = 0; i < MAX_BACKUP; i++)
+  {
+    memset(&USART_BackUP[i].USART_BackUP, 0, sizeof(USART_HandleTypeDef));
+
+    USART_BackUP[i].USART_BackUP.Instance = NULL;
+
+    USART_BackUP[i].suspend_flag = RESET;
+  }
+}
 
 
 
@@ -167,6 +223,8 @@ void Cus_USART_Single_Init( uint32_t baudrate )
     baudrate = 9600;
   }
 
+  Cus_USART_BackUP_Initial();
+
   USART_GPIO_Init();
 
   if (USARTx == USART1)   __HAL_RCC_USART1_CLK_ENABLE();
@@ -230,6 +288,8 @@ void Cus_USART_Dual_Init( USART_HandleTypeDef *USART_1,
                              USART_HandleTypeDef *USART_2,
                                 Initial_Mode mode )
 {
+  Cus_USART_BackUP_Initial();
+
   USART_GPIO_Init();
 
   switch ((uint32_t)USART_1 -> Instance) 
@@ -310,5 +370,88 @@ void Cus_USART_Dual_Init( USART_HandleTypeDef *USART_1,
 
     HAL_USART_Init(&USART2_dual_handle);
   }
+}
+
+
+void Cus_USART_Suspend( USART_HandleTypeDef *USART )
+{
+  uint8_t Count = 0 ;
+
+  for(uint8_t i = 0; i < MAX_BACKUP; i++)
+  {
+    if (USART_BackUP[i].suspend_flag == SET) Count++;
+
+    if (Count == 5)
+    {
+      printf("Suspend Error.Suspend List has not enough memory.\n");
+
+      return;
+    }
+  }
+
+  USART_BackUP[Index].USART_BackUP = *USART;
+
+  USART_BackUP[Index].suspend_flag = SET;
+
+  HAL_USART_DeInit(USART);
+
+  switch ((uint32_t)USART -> Instance) 
+  {
+
+    case (uint32_t)USART1:
+        __HAL_RCC_USART1_CLK_DISABLE();
+        break;
+    case (uint32_t)USART2:
+        __HAL_RCC_USART2_CLK_DISABLE();
+        break;
+    case (uint32_t)USART3:
+        __HAL_RCC_USART3_CLK_DISABLE();
+        break;
+    default:
+        // 默认情况处理
+        break;
+  }
+
+  Index++;
+}
+
+
+void Cus_USART_Resume( USART_HandleTypeDef *USART )
+{
+  for(uint8_t i = 0; i < MAX_BACKUP; i++)
+  {
+    if (memcmp(&USART_BackUP[i].USART_BackUP, USART, sizeof(USART_HandleTypeDef)) == 0
+          && USART_BackUP[i].suspend_flag == SET)
+    {
+      switch ((uint32_t)USART -> Instance) 
+      {
+    
+        case (uint32_t)USART1:
+            __HAL_RCC_USART1_CLK_ENABLE();
+            break;
+        case (uint32_t)USART2:
+            __HAL_RCC_USART2_CLK_ENABLE();
+            break;
+        case (uint32_t)USART3:
+            __HAL_RCC_USART3_CLK_ENABLE();
+            break;
+        default:
+            // 默认情况处理
+            break;
+      }
+
+      USARTx_handle = USART_BackUP[i].USART_BackUP;
+
+      HAL_USART_Init(&USARTx_handle);
+
+      USART_BackUP[i].suspend_flag = RESET;
+
+      Index = i;
+
+      return;
+    }
+  }
+
+  printf("Resume Error. Not found this USART in Suspend List.\n"); 
 }
 
